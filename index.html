@@ -94,7 +94,8 @@ td .bt{display:block;min-width:120px}
 <footer>ADSIN · The Learning Hub — Daily Activity Report Intelligence · data from your Google Sheet, refreshed automatically</footer>
 <script>
 const CFG={SHEET:"https://docs.google.com/spreadsheets/d/127bWzzv9LbkjfvfwDHwLnA_WMoDV2ljMmgieRho5QHE/edit?usp=sharing",MIN:5,
-TABS:{sales:"SALES_EXECUTIVE DAR",acad:"ACADEMIC_HEAD",ment:"MENTORS_DAR",mkt:"MARKETING_EXECUTIVE",med:"MEDIA_EXECUTIVES",plc:"PLACEMENTCORDINATOR_DAR",onl:"ONLINE_MENTORS"}};
+TABS:{sales:"SALES_EXECUTIVE DAR",acad:"ACADEMIC_HEAD",ment:"MENTORS_DAR",mkt:"MARKETING_EXECUTIVE",med:"MEDIA_EXECUTIVES",plc:"PLACEMENTCORDINATOR_DAR",onl:"ONLINE_MENTORS",off:"OFFLINE_MENTORS"},
+ALIAS:{/* optional manual merges, e.g. "nazal tt":"Nazal" */}};
 const SID=/\/d\/([\w-]+)/.exec(CFG.SHEET)[1],$=s=>document.querySelector(s);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const num=v=>{if(v==null||v==="")return 0;const n=typeof v==="number"?v:parseFloat(String(v).replace(/[^\d.-]/g,""));return isFinite(n)?n:0};
@@ -133,7 +134,10 @@ function build(){E=[];const add=(d,n,r,m,x)=>{let dt=g(r,"REPORT DATE")||g(r,"TI
   add("sales",n,r,m,{ch:g(r,"REASON FOR TARGET SHORTFALL"),su:g(r,"SUPPORT REQUIRED FROM MANAGER"),rem})}
  for(const k of["mkt","med"])for(const r of RAW[k]||[]){const n=g(r,"EMPLOYEE NAME");if(!n)continue;const s=String(g(r,"STATUS")||"").toUpperCase(),o=String(g(r,"SUBMISSION")||"").toUpperCase(),dep=g(r,"DEPARTMENT")||"Other";
   add(k,n,r,{t:1,done:+(s==="DONE"),prog:+(s==="IN PROGRESS"),nd:+(s==="NOT DONE"),ot:+(o==="ON TIME"),late:+(o==="LATE"),ex:+(String(g(r,"TYPE")).toUpperCase()==="EXTRA")},{task:g(r,"TASK"),st:s,rem:g(r,"REMARKS"),cnt:{sub:{[tc(String(dep))]:1}},sd:+(s==="DONE")})}
- for(const r of RAW.ment||[]){const t=g(r,"SESSION DETAILS"),m=mapM(r,MAPS.ment);m.bsY=cc(t,/BATCH SHEET UPDATED: YES/gi);m.bsN=cc(t,/BATCH SHEET UPDATED: NO/gi);m.waY=cc(t,/WHATSAPP GROUP: YES/gi);m.waN=cc(t,/WHATSAPP GROUP: NO/gi);add("ment",g(r,"FACULTY NAME"),r,m,{rem:g(r,"OTHER DAILY REMARKS")})}
+ for(const r of RAW.ment||[]){const t=g(r,"SESSION DETAILS"),m=mapM(r,MAPS.ment);m.bsY=cc(t,/BATCH SHEET UPDATED: YES/gi);m.bsN=cc(t,/BATCH SHEET UPDATED: NO/gi);m.waY=cc(t,/WHATSAPP GROUP: YES/gi);m.waN=cc(t,/WHATSAPP GROUP: NO/gi);add("ment",g(r,"FACULTY NAME"),r,m,{rem:g(r,"OTHER DAILY REMARKS"),mode:"Mentor DAR"})}
+  for(const k of["onl","off"])for(const r of RAW[k]||[]){const ks=Object.keys(r),nk=ks.find(h=>/(MENTOR|FACULTY|EMPLOYEE|TRAINER).*NAME/.test(h))||ks.find(h=>/^NAME$/.test(h))||ks.find(h=>/NAME|MENTOR|FACULTY/.test(h));if(!nk||!r[nk])continue;if(!g(r,"REPORT DATE")&&!g(r,"TIMESTAMP")){const dk_=ks.find(h=>/DATE/.test(h));if(dk_)r["REPORT DATE"]=r[dk_]}
+   const t=g(r,"SESSION DETAILS"),m=mapM(r,MAPS.ment);m.bsY=cc(t,/BATCH SHEET UPDATED: YES/gi);m.bsN=cc(t,/BATCH SHEET UPDATED: NO/gi);m.waY=cc(t,/WHATSAPP GROUP: YES/gi);m.waN=cc(t,/WHATSAPP GROUP: NO/gi);add("ment",r[nk],r,m,{rem:g(r,"REMARKS"),mode:k==="off"?"Offline":"Online"})}
+  mergeNames();
  for(const r of RAW.acad||[]){const n=g(r,"ACADEMIC HEAD");if(!n)continue;const m=mapM(r,MAPS.acad);if(!m.se)m.sp=0;m.satn=m.sat>0?1:0;const dt=g(r,"STUDENT CONCERNS, DISCIPLINE & FEE FOLLOW-UP - DETAILS"),sy=g(r,"SYLLABUS REVIEW - DETAILS");
   add("acad",n,r,m,{ch:g(r,"MAJOR ISSUES / ESCALATIONS"),su:g(r,"SUPPORT / APPROVALS REQUIRED"),rem:g(r,"KEY ACHIEVEMENTS"),cnt:{it:tcount(dt,/ISSUE TYPE: ([A-Za-z ]+?) \|/g),is:tcount(dt,/STATUS: (Resolved|In Progress|Pending|Escalated to Management)/g),sy:tcount(sy,/SYLLABUS STATUS: ([A-Za-z ]+?) \|/g)}})}
  for(const r of RAW.plc||[]){const n=g(r,"PLACEMENT COORDINATOR");if(!n)continue;add("plc",n,r,mapM(r,MAPS.plc),{ch:g(r,"CHALLENGES / PENDING ISSUES"),su:g(r,"SUPPORT REQUIRED"),rem:g(r,"KEY ACHIEVEMENTS")})}
@@ -352,7 +356,20 @@ function vContrib(d){const km=KEYM[d],sc=(SC[d]||[]).filter(p=>p.n!=="(name not 
   `<div class="s" style="margin-top:4px">${weak?(weak[1]>=.8?`✅ Strong across checks. Weakest: ${esc(weak[0])} (${Math.round(weak[1]*100)}%).`:`⚠️ Improve: <b>${esc(weak[0])}</b> (${Math.round(weak[1]*100)}%).`):""}</div></div>`}).join("")+`</div>`;
  return h}
 
-const TABS=[["overview","Overview",vOverview],["compare","Compare",vCompare],["decisions","Decisions",vDecisions],["sales","Sales",()=>((vSales)()+vContrib("sales"))],["mkt","Marketing",()=>((()=>vTask("mkt"))()+vContrib("mkt"))],["med","Media",()=>((()=>vTask("med"))()+vContrib("med"))],["ment","Mentors",()=>((vMent)()+vContrib("ment"))],["acad","Academics",()=>((vAcad)()+vContrib("acad"))],["plc","Placement",()=>((vPlc)()+vContrib("plc"))],["issues","Issues",vIssues],["targets","Targets",vTargets],["quality","Data quality",vQuality],["data","Data",vData],["sheet","Sheet",vSheet]];
+/* ---------- same-person name merging ---------- */
+let MERGED=[];
+function mergeNames(){MERGED=[];const nz=n=>n.toLowerCase().replace(/[^a-z ]/g," ").trim().split(/\s+/).filter(Boolean),AL=CFG.ALIAS||{};
+ for(const d of SECT){const rows=E.filter(e=>e.d===d&&e.k!=="?");if(!rows.length)continue;const names={};
+  rows.forEach(e=>{const a=AL[nz(e.n).join(" ")];if(a)e.n=tc(a);(names[e.n]=names[e.n]||[]).push(e)});
+  const list=Object.keys(names).map(n=>({n,t:nz(n)})),map={},comp=t=>t.slice(1).join("");
+  list.forEach(s=>{const cand=list.filter(c=>c!==s&&c.t[0]===s.t[0]&&(s.t.length===1||(c.t.length>s.t.length&&s.t.every((x,i)=>c.t[i]===x))||(s.t.length>1&&comp(c.t)===comp(s.t)&&c.n.length>s.n.length)));
+   if(cand.length===1&&(s.t.length>1||c_ok(s,list)))map[s.n]=cand[0].n});
+  Object.keys(map).forEach(a=>{let b=map[a],i=0;while(map[b]&&i++<5)b=map[b];names[a].forEach(e=>{e.n=b;e.k=nameKey(b)});MERGED.push([D[d].l,a,b])})}}
+const c_ok=()=>true;
+function vMerged(){return`<h2>Names treated as the same person</h2><div class="card">${MERGED.length?`<p class="note" style="margin-top:0">These spellings were joined automatically so each person appears once. If one is wrong, tell me or add it to <b>CFG.ALIAS</b>.</p>${MERGED.map(m=>`<span class="tag">${esc(m[0])}: ${esc(m[1])} → <b>${esc(m[2])}</b></span>`).join("")}`:'<p class="note" style="margin:0">No duplicate spellings found.</p>'}</div>`}
+function vModes(){const rs=dr("ment"),by={};rs.forEach(e=>{const m=e.mode||"Mentor DAR";(by[m]=by[m]||[]).push(e)});const ks=Object.keys(by);if(ks.length<2)return"";return`<h2>Offline &amp; online mentors</h2><div class="g2">`+pn("Sessions completed by mode",donut(ks.map(k=>[k,tot(by[k]).comp||0])))+pn("Reports by mode",barH(ks.map(k=>[k,by[k].length])))+`</div>`}
+
+const TABS=[["overview","Overview",vOverview],["compare","Compare",vCompare],["decisions","Decisions",vDecisions],["sales","Sales",()=>((vSales)()+vContrib("sales"))],["mkt","Marketing",()=>((()=>vTask("mkt"))()+vContrib("mkt"))],["med","Media",()=>((()=>vTask("med"))()+vContrib("med"))],["ment","Mentors",()=>((vMent)()+vModes()+vContrib("ment"))],["acad","Academics",()=>((vAcad)()+vContrib("acad"))],["plc","Placement",()=>((vPlc)()+vContrib("plc"))],["issues","Issues",vIssues],["targets","Targets",vTargets],["quality","Data quality",()=>vQuality()+vMerged()],["data","Data",vData],["sheet","Sheet",vSheet]];
 /* ---------- ticker ---------- */
 function ticker(){const el=$("#ticker");if(!E.length){el.hidden=true;return}const it=[],add=(c,t,h,go)=>it.push(`<span class="tk-i" data-go="${go||""}"><span class="tk-${c}">${t}</span>${h}</span><span class="tk-sep">◆</span>`);
  const s=tot(dr("sales"));add("h","Fees",`<b>${inr(s.fees||0)}</b> <span class="tk-s">collected · ${N(s.leads||0)} leads</span>`,"sales");
@@ -379,7 +396,9 @@ function gviz(tab){return new Promise((res,rej)=>{const n="gv"+Math.random().toS
   res(t.table.rows.map(r=>{const o={};r.c.forEach((c,i)=>{let v=c?c.v:null;if(typeof v==="string"){const m=/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?/.exec(v);if(m)v=new Date(+m[1],+m[2],+m[3],+(m[4]||0),+(m[5]||0),+(m[6]||0))}if(cols[i])o[cols[i]]=v});return o}))};
  s.onerror=()=>{clearTimeout(tm);end();rej(new Error("blocked"))};s.src=`https://docs.google.com/spreadsheets/d/${SID}/gviz/tq?tqx=out:json;responseHandler:${n}&headers=1&sheet=${encodeURIComponent(tab)}&_=${Date.now()}`;document.head.appendChild(s)})}
 async function load(){setLive("","● Loading…");const ks=Object.keys(CFG.TABS),rs=await Promise.allSettled(ks.map(k=>gviz(CFG.TABS[k]))),bad=[];
- rs.forEach((r,i)=>{if(r.status==="fulfilled")RAW[ks[i]]=r.value;else bad.push(CFG.TABS[ks[i]])});
+ const sig=v=>v&&v[0]?JSON.stringify(v[0]):"";
+  rs.forEach((r,i)=>{if(r.status!=="fulfilled"){bad.push(CFG.TABS[ks[i]]);return}
+   if(ks[i]==="off"&&sig(r.value)&&ks.some((k,j)=>k!=="off"&&rs[j].status==="fulfilled"&&sig(rs[j].value)===sig(r.value))){bad.push(CFG.TABS[ks[i]]+" (tab not found)");RAW.off=[]}else RAW[ks[i]]=r.value});
  if(bad.length===ks.length){setLive("err","● Live load failed");$("#upd").textContent="Share the sheet as “Anyone with the link – Viewer”, or use Upload .xlsx.";return}
  build();setLive("ok","● Live"+(bad.length?` · ${bad.length} tab(s) not read`:""));$("#upd").textContent="Updated "+new Date().toLocaleTimeString();render()}
 $("#fi").onchange=async e=>{const f=e.target.files[0];if(!f)return;const wb=XLSX.read(await f.arrayBuffer(),{cellDates:true});RAW={};
