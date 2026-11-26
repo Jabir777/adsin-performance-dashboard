@@ -149,7 +149,7 @@ function win(){const p=ST.pre;if(!MAXD)return{cur:E,prev:[],n:0,label:"All data"
  else{f=ST.cf?new Date(ST.cf+"T00:00:00"):add(T,-29);t=ST.ct?new Date(ST.ct+"T00:00:00"):T;if(t<f){const z=f;f=t;t=z}}
  const n=Math.round((t-f)/864e5)+1,a0=add(f,-n),a1=add(f,-1),nm=(PRE.find(x=>x[0]===p)||["","Custom range"])[1];
  return{cur:E.filter(e=>e.dt>=f&&e.dt<=t),prev:E.filter(e=>e.dt>=a0&&e.dt<=a1),n,f,t,label:`${nm} · ${fd(f)} – ${fd(t)}`}}
-const dr=(d,w=W.cur)=>w.filter(e=>e.d===d);
+let MF=null;const dr=(d,w=W.cur)=>w.filter(e=>e.d===d&&(!MF||d!=="ment"||e.mode===MF));
 function tot(rows){const t={};rows.forEach(e=>{for(const m in e.m)t[m]=(t[m]||0)+e.m[m]});t.satAvg=t.satn?t.sat/t.satn:null;return t}
 function agg(rows){const o={};for(const e of rows){const x=o[e.k]||(o[e.k]={n:e.n,d:e.d,days:new Set(),last:e.dt});if(e.n.length>x.n.length&&e.k!=="?")x.n=e.n;x.days.add(dk(e.dt));if(e.dt>x.last)x.last=e.dt;for(const m in e.m)x[m]=(x[m]||0)+e.m[m]}
  return Object.values(o).map(x=>(x.days=x.days.size,x))}
@@ -230,7 +230,7 @@ function vOverview(){const R=W.cur,P_=W.prev,by=d=>tot(dr(d)),s=by("sales"),ps=t
  const dys=[];for(let i=13;i>=0;i--){const d=new Date(MAXD||Date.now());d.setDate(d.getDate()-i);dys.push(d)}
  const filed={};E.forEach(e=>filed[e.d+"|"+e.k+"|"+dk(e.dt)]=1);const ppl2=SECT.flatMap(d=>(SC[d]||[]).map(p=>[d,p]));
  h+=`<h2>DAR submission tracker <small>✓ filed · · nothing filed — last 14 days</small></h2><div class="tw"><table class="mx"><thead><tr><th>Employee</th>${dys.map(d=>`<th>${d.getDate()}<br>${WD[wdi(d)][0]}</th>`).join("")}</tr></thead><tbody>${ppl2.map(([d,p])=>{const k=nameKey(p.n);return`<tr><td>${esc(p.n)} <span class="note">${D[d].l}</span></td>${dys.map(x=>filed[d+"|"+k+"|"+dk(x)]?'<td class="y">✓</td>':'<td class="n">·</td>').join("")}</tr>`}).join("")}</tbody></table></div>`;
- return h+vExtras()+`<h2>Month-end outlook</h2>`+fc()}
+ return h+vExtras()+vModes()+`<h2>Month-end outlook</h2>`+fc()}
 function mtd(){const mo=MAXD?E.filter(e=>e.dt.getMonth()===MAXD.getMonth()&&e.dt.getFullYear()===MAXD.getFullYear()):[];return mo}
 function fc(){if(!MAXD)return"";const mo=mtd(),dim=new Date(MAXD.getFullYear(),MAXD.getMonth()+1,0).getDate(),el=MAXD.getDate(),s=tot(mo.filter(e=>e.d==="sales")),p=tot(mo.filter(e=>e.d==="plc")),mm=tot(mo.filter(e=>e.d==="ment")),f=v=>v/el*dim;
  return`<div class="grid">`+kp("Fees — month to date",inr(s.fees||0),`Projected ${inr(f(s.fees||0))} by month end`)+kp("Leads — month to date",N(s.leads||0),`Projected ${N(f(s.leads||0))}`)+kp("Registrations",N(s.reg||0),`Projected ${N(f(s.reg||0))}`)+kp("Sessions done",N(mm.comp||0),`Projected ${N(f(mm.comp||0))}`)+kp("Interviews held",N(p.iv||0),`Projected ${N(f(p.iv||0))}`)+`</div><p class="note">Projection = month-to-date ÷ ${el} days reported × ${dim} days in ${MAXD.toLocaleString("en",{month:"long"})}.</p>`}
@@ -342,7 +342,7 @@ function bnav(){$("#bn").innerHTML=[["overview","🏠","Overview"],["sales","�
 
 /* ---------- v3: employee contribution & performance ---------- */
 const KEYM={sales:[["fees","Fees collected",inr],["leads","Leads handled",N],["reg","Registrations",N]],mkt:[["done","Tasks done",N],["t","Tasks logged",N],["ot","On-time",N]],med:[["done","Tasks done",N],["t","Tasks logged",N],["ot","On-time",N]],ment:[["comp","Sessions done",N],["pres","Students present",N],["exp","Students expected",N]],acad:[["cc","Classes held",N],["sp","Students present",N],["cs","Classes scheduled",N]],plc:[["cv","CVs shared",N],["iv","Interviews held",N],["se","Selected",N]]};
-function vContrib(d){const km=KEYM[d],sc=(SC[d]||[]).filter(p=>p.n!=="(name not entered)");if(!km||!sc.length)return"";
+function vContrib(d){const km=KEYM[d],sc=(MF?score(d,dr(d)):(SC[d]||[])).filter(p=>p.n!=="(name not entered)");if(!km||!sc.length)return"";
  const pv={};agg(dr(d,W.prev)).forEach(a=>pv[a.n]=a);const T=tot(dr(d)),pm=km[0][0];
  const col=s=>s>=75?"#34d399":s>=50?"#fbbf24":"#fb7185";
  const ordered=sc.slice().sort((a,b)=>(b.a[pm]||0)-(a.a[pm]||0));
@@ -369,7 +369,11 @@ const c_ok=()=>true;
 function vMerged(){return`<h2>Names treated as the same person</h2><div class="card">${MERGED.length?`<p class="note" style="margin-top:0">These spellings were joined automatically so each person appears once. If one is wrong, tell me or add it to <b>CFG.ALIAS</b>.</p>${MERGED.map(m=>`<span class="tag">${esc(m[0])}: ${esc(m[1])} → <b>${esc(m[2])}</b></span>`).join("")}`:'<p class="note" style="margin:0">No duplicate spellings found.</p>'}</div>`}
 function vModes(){const rs=dr("ment"),by={};rs.forEach(e=>{const m=e.mode||"Mentor DAR";(by[m]=by[m]||[]).push(e)});const ks=Object.keys(by);if(ks.length<2)return"";return`<h2>Offline &amp; online mentors</h2><div class="g2">`+pn("Sessions completed by mode",donut(ks.map(k=>[k,tot(by[k]).comp||0])))+pn("Reports by mode",barH(ks.map(k=>[k,by[k].length])))+`</div>`}
 
-const TABS=[["overview","Overview",vOverview],["compare","Compare",vCompare],["decisions","Decisions",vDecisions],["sales","Sales",()=>((vSales)()+vContrib("sales"))],["mkt","Marketing",()=>((()=>vTask("mkt"))()+vContrib("mkt"))],["med","Media",()=>((()=>vTask("med"))()+vContrib("med"))],["ment","Mentors",()=>((vMent)()+vModes()+vContrib("ment"))],["acad","Academics",()=>((vAcad)()+vContrib("acad"))],["plc","Placement",()=>((vPlc)()+vContrib("plc"))],["issues","Issues",vIssues],["targets","Targets",vTargets],["quality","Data quality",()=>vQuality()+vMerged()],["data","Data",vData],["sheet","Sheet",vSheet]];
+function vMentMode(mode,tab){MF=mode;try{const n=dr("ment").length;
+ if(!n)return`<h2>${mode==="Mentor DAR"?"Mentors":mode+" mentors"}</h2><div class="card"><b>No rows found for this section in ${esc(W.label)}.</b><p class="note" style="margin:6px 0 0">This section reads the Google Sheet tab <b>${esc(tab)}</b>. If the tab has data, check that the tab name matches exactly (it is set in CFG.TABS at the top of the code) or pick a wider period such as <b>All data</b>.</p></div>`;
+ return vMent()+vContrib("ment")}finally{MF=null}}
+
+const TABS=[["overview","Overview",vOverview],["compare","Compare",vCompare],["decisions","Decisions",vDecisions],["sales","Sales",()=>((vSales)()+vContrib("sales"))],["mkt","Marketing",()=>((()=>vTask("mkt"))()+vContrib("mkt"))],["med","Media",()=>((()=>vTask("med"))()+vContrib("med"))],["ment","Mentors",()=>vMentMode("Mentor DAR","MENTORS_DAR")],["onl","Online mentors",()=>vMentMode("Online","ONLINE_MENTORS")],["off","Offline mentors",()=>vMentMode("Offline","OFFLINE_MENTORS")],["acad","Academics",()=>((vAcad)()+vContrib("acad"))],["plc","Placement",()=>((vPlc)()+vContrib("plc"))],["issues","Issues",vIssues],["targets","Targets",vTargets],["quality","Data quality",()=>vQuality()+vMerged()],["data","Data",vData],["sheet","Sheet",vSheet]];
 /* ---------- ticker ---------- */
 function ticker(){const el=$("#ticker");if(!E.length){el.hidden=true;return}const it=[],add=(c,t,h,go)=>it.push(`<span class="tk-i" data-go="${go||""}"><span class="tk-${c}">${t}</span>${h}</span><span class="tk-sep">◆</span>`);
  const s=tot(dr("sales"));add("h","Fees",`<b>${inr(s.fees||0)}</b> <span class="tk-s">collected · ${N(s.leads||0)} leads</span>`,"sales");
